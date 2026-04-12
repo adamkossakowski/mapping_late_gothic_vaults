@@ -1,9 +1,8 @@
 
 <!DOCTYPE html>
-<html lang="pl">
+<html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atlas Sklepień - Projekt PhD</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
@@ -13,15 +12,7 @@
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-        .vault-illustration {
-            width: 100%;
-            height: auto;
-            max-height: 250px;
-            margin-top: 10px;
-            border-radius: 4px;
-            object-fit: contain;
-            background: #f0f0f0;
-        }
+        .popup-link { display: block; margin-top: 10px; padding: 8px; background: #3498db; color: white; text-align: center; text-decoration: none; border-radius: 4px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -31,42 +22,30 @@
         const map = L.map('map').setView([53.8, 19.0], 6);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
+            attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        const markers = L.markerClusterGroup({
-            spiderfyOnMaxZoom: true,
-            showCoverageOnHover: false
-        });
+        const markers = L.markerClusterGroup();
 
         sites.forEach(s => {
             if(s.Szerokosc && s.Dlugosc) {
                 const color = s.Kategoria === "Sakralna" ? "#3498db" : "#e74c3c";
                 const marker = L.circleMarker([s.Szerokosc, s.Dlugosc], {
-                    radius: 10,
-                    fillColor: color,
-                    color: "#fff",
-                    weight: 2,
-                    fillOpacity: 0.8
+                    radius: 12, fillColor: color, color: "#fff", weight: 2, fillOpacity: 0.8
                 });
                 
-                let imgHtml = s.Ilustracja ? `<img src="images/${s.Ilustracja}" class="vault-illustration" alt="Rzut">` : "";
-                
                 marker.bindPopup(`
-                    <div style="font-family: sans-serif; min-width: 250px;">
-                        <b style="font-size:14px">${s.Nazwa || "Obiekt"}</b> (${s.Miasto || ""})<br>
+                    <div style="font-family: sans-serif; min-width: 200px;">
+                        <b style="font-size:14px">${s.Nazwa}</b><br>
+                        ${s.Miasto}<br>
                         <hr>
-                        <b>Majster:</b> ${s.Majster || "Nieznany"}<br>
-                        <b>Typ:</b> ${s.Typ_Sklepienia || "---"}<br>
-                        <b>Datowanie:</b> ${s.Datowanie || "---"}<br>
-                        <i>${s.Opis || ""}</i>
-                        ${imgHtml}
+                        <b>Datowanie:</b> ${s.Datowanie}<br>
+                        <a href="details/${s.ID}.html" class="popup-link">Pełna karta obiektu →</a>
                     </div>
                 `);
                 markers.addLayer(marker);
             }
         });
-
         map.addLayer(markers);
     </script>
 </body>
