@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapping Late Gothic Vaults</title>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Open Sans', sans-serif; color: #333; overflow: hidden; }
+        #sidebar { width: 380px; background: white; z-index: 1000; box-shadow: 2px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow-y: auto; }
+        #map-container { flex-grow: 1; position: relative; }
+        #map { height: 100%; width: 100%; }
+        .header { background: #1e293b; color: white; padding: 35px 25px; }
+        .header h1 { font-family: 'Merriweather', serif; margin: 0; font-size: 1.6em; line-height: 1.2; text-align: center; }
+        .panel-content { padding: 25px; flex-grow: 1; }
+        .section-title { font-size: 0.85em; text-transform: uppercase; font-weight: 700; color: #64748b; letter-spacing: 1px; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        .filter-group { margin-bottom: 30px; }
+        .filter-label { display: flex; align-items: center; margin-bottom: 10px; cursor: pointer; font-weight: 600; font-size: 0.95em; }
+        .filter-label input { margin-right: 10px; width: 16px; height: 16px; cursor: pointer; }
+        .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .dot-sacral { background: #1e3a8a; border: 2px solid #60a5fa; }
+        .dot-secular { background: #991b1b; border: 2px solid #f87171; }
+        .stats-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+        .stats-num { font-family: 'Merriweather', serif; font-size: 2em; color: #0f172a; font-weight: 700; display: block; }
+        .stats-text { font-size: 0.85em; color: #64748b; text-transform: uppercase; font-weight: 600; }
+        
+        .custom-tooltip { background: rgba(15, 23, 42, 0.95) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 20px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 450px; white-space: normal; }
+        .custom-tooltip:before { display: none; }
+        .t-title { font-family: 'Merriweather', serif; font-size: 1.3em; color: #38bdf8; margin-bottom: 2px; }
+        .t-city { font-weight: 600; color: #e2e8f0; margin-bottom: 15px; display: block; font-size: 1.05em; }
+        .t-meta { color: #94a3b8; font-size: 1em; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; }
+        .t-meta span:nth-child(odd) { text-transform: uppercase; font-size: 0.85em; font-weight: 700; color: #cbd5e1; }
+        .t-meta span:nth-child(even) { color: #f8fafc; }
+        
+        .tooltip-img { max-width: 100%; height: auto; max-height: 120px; margin-top: 15px; border-radius: 4px; object-fit: contain; display: block; margin-left: auto; margin-right: auto; }
+
+        .btn-more { display: block; margin-top: 15px; padding: 12px; background: #1e293b; color: white !important; text-align: center; text-decoration: none; border-radius: 6px; font-weight: 600; transition: background 0.2s; }
+        .btn-more:hover { background: #334155; }
+        .custom-cluster { background: rgba(30, 41, 59, 0.9); color: white; border: 3px solid rgba(255,255,255,0.5); border-radius: 50%; text-align: center; font-weight: 700; font-family: 'Open Sans'; box-shadow: 0 0 15px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center; }
+        
+        @media (max-width: 768px) {
+            body { flex-direction: column-reverse; }
+            #sidebar { width: 100%; height: 40vh; box-shadow: 0 -2px 15px rgba(0,0,0,0.1); }
+            #map-container { height: 60vh; }
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="header">
+            <h1>Mapping Late Gothic Vaults</h1>
+        </div>
+        <div class="panel-content">
+            <div class="stats-box">
+                <span class="stats-num" id="obj-count">0</span>
+                <span class="stats-text">Wyświetlanych obiektów</span>
+            </div>
+            <div class="filter-group">
+                <div class="section-title">Filtruj Kategorię</div>
+                <label class="filter-label">
+                    <input type="checkbox" id="chk-sakralna" checked>
+                    <span class="color-dot dot-sacral"></span> Architektura Sakralna
+                </label>
+                <label class="filter-label">
+                    <input type="checkbox" id="chk-swiecka" checked>
+                    <span class="color-dot dot-secular"></span> Architektura Świecka
+                </label>
+            </div>
+            <div class="section-title">O projekcie</div>
+            <p style="font-size: 0.9em; color: #64748b; text-align: justify; line-height: 1.6;">
+                Mapa stanowi interaktywny aneks do dysertacji doktorskiej. Użyj przybliżenia, aby rozsunąć obiekty znajdujące się w tych samych lokalizacjach. Najechanie na punkt wyświetla metadane, kliknięcie pozwala przejść do pełnej karty obiektu.
+            </p>
+        </div>
+    </div>
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
+    <script>
+        const rawData = [{"ID":1,"Nazwa":"Ko\u015bci\u00f3\u0142 Cysters\u00f3w","Miasto":"Oliwa","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienia krzy\u017cowo-\u017cebrowe z \u017cebrem przewodnim + \"typ mostowy\"","Umiejscowienie":"Ch\u00f3r","Datowanie":"przed ko\u0144cem XIV w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.4110645473,"Dlugosc":18.5592230471,"Ilustracja":"Oliwa.jpg","Fotografia":null},{"ID":2,"Nazwa":"Zamek","Miasto":"Lidzbark","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"\u015awiecka","Typ_Sklepienia":null,"Umiejscowienie":"Kaplica","Datowanie":"4. \u0107w. XIV w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.1261098412,"Dlugosc":20.5837018456,"Ilustracja":"Lidzbark zamek.jpg","Fotografia":null},{"ID":3,"Nazwa":"Pa\u0142ac Wielkich Mistrz\u00f3w","Miasto":"Malbork","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"\u015awiecka","Typ_Sklepienia":null,"Umiejscowienie":"Refektarze letni i zimowy","Datowanie":"1393\u20131399","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.0404160834,"Dlugosc":19.0276472278,"Ilustracja":"Malbork,jpg","Fotografia":null},{"ID":4,"Nazwa":"Fara","Miasto":"Golub","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Ch\u00f3r","Datowanie":"prze\u0142om XIV\/XV w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.1130839924,"Dlugosc":19.0554252099,"Ilustracja":"Golub.jpg","Fotografia":null},{"ID":5,"Nazwa":"Katedra","Miasto":"Che\u0142m\u017ca","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z \u017cebrami grzbietowymi i tr\u00f3jk\u0105tnymi szczycikami na obu osiach dotykaj\u0105cymi obwodu sklepienia","Umiejscowienie":"Skrzy\u017cowanie naw","Datowanie":"po 1422","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.2099111497,"Dlugosc":18.6926796362,"Ilustracja":"Chelmza.jpg","Fotografia":null},{"ID":6,"Nazwa":"Katedra","Miasto":"Che\u0142m\u017ca","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienia komponowane z prz\u0119se\u0142 tr\u00f3jk\u0105tnych","Umiejscowienie":"Pd. nawa boczna","Datowanie":"po 1422","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.2099111497,"Dlugosc":18.6926796362,"Ilustracja":"Chelmza.jpg","Fotografia":null},{"ID":7,"Nazwa":"Ko\u015bci\u00f3\u0142 Cysters\u00f3w","Miasto":"Pelplin","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienia z dodatkowymi \u017ceberkami wi\u0105\u017c\u0105cymi na osi wzd\u0142u\u017cnej","Umiejscowienie":"Nawa g\u0142\u00f3wna korpusu","Datowanie":"przed 1427","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.9275852729,"Dlugosc":18.6945965142,"Ilustracja":"Pelplin.jpg","Fotografia":null},{"ID":8,"Nazwa":"Fara","Miasto":"Nowe Miasto Lubawskie","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienia czteroramienne z dodatkowymi szczycikami na osi wzd\u0142u\u017cnej","Umiejscowienie":"Nawa g\u0142\u00f3wna","Datowanie":"po 1460","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.4263609017,"Dlugosc":19.6025656776,"Ilustracja":"Nowe Miasto Lubawskie.jpg","Fotografia":null},{"ID":9,"Nazwa":"Fara","Miasto":"Bydgoszcz","Region":"Kujawy","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adzisto-sieciowe","Umiejscowienie":"Prezbiterium","Datowanie":"1460\u20131502","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.1229815762,"Dlugosc":17.9995439126,"Ilustracja":"Bydgoszcz.jpg","Fotografia":null},{"ID":10,"Nazwa":"Fara \u015bw. Jana","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z \u017cebrami wpisanymi tworz\u0105cymi rysunek krzy\u017ca malta\u0144skiego z tr\u00f3jk\u0105tnymi szczycikami","Umiejscowienie":"Transept","Datowanie":"1463\u20131465","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3520305817,"Dlugosc":18.6564557999,"Ilustracja":"Gdansk Jan.jpg","Fotografia":null},{"ID":11,"Nazwa":"Fara \u015bw. Jana","Miasto":"Toru\u0144","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z \u017cebrami wpisanymi tworz\u0105cymi rysunek krzy\u017ca malta\u0144skiego z tr\u00f3jk\u0105tnymi szczycikami","Umiejscowienie":"Nawa g\u0142\u00f3wna","Datowanie":"1468\u20131473","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.0094318044,"Dlugosc":18.6069194993,"Ilustracja":"Torun Jan.jpg","Fotografia":null},{"ID":12,"Nazwa":"Fara","Miasto":"Grudzi\u0105dz","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste o\u015bmioramienne z \u017cebrami wpisanymi","Umiejscowienie":"Nawa g\u0142\u00f3wna","Datowanie":"2. po\u0142. XV w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.4931428688,"Dlugosc":18.7488386471,"Ilustracja":"Grudziadz.jpg","Fotografia":null},{"ID":13,"Nazwa":"Dw\u00f3r Artusa","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"\u015awiecka","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z \u017cebrami wpisanymi tworz\u0105cymi rysunek krzy\u017ca","Umiejscowienie":null,"Datowanie":"1476\u20131481","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3489138391,"Dlugosc":18.653831611,"Ilustracja":"Gdansk Dwor Artusa.jpg","Fotografia":null},{"ID":14,"Nazwa":"Ko\u015bci\u00f3\u0142 Franciszkan\u00f3w","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"1481\u20131514","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3458145894,"Dlugosc":18.6473260364,"Ilustracja":"Gdansk klasztor franciszkanow.jpg","Fotografia":null},{"ID":15,"Nazwa":"Fara NMP","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"1498\u20131502","Majster":"Heinrich Hetzel","Literatura":"Frazik 1979","Szerokosc":54.3499286697,"Dlugosc":18.6538500321,"Ilustracja":"Gdansk Mariacki.jpg","Fotografia":"Gdansk Mariacki2.jpg"},{"ID":16,"Nazwa":"Fara \u015bw. Katarzyny","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":1500,"Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3541891809,"Dlugosc":18.6517409197,"Ilustracja":"Gdansk Katarzyna.jpg","Fotografia":null},{"ID":17,"Nazwa":"Ko\u015bci\u00f3\u0142 Dominikan\u00f3w","Miasto":"Elbl\u0105g","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"po 1504","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.1606350303,"Dlugosc":19.3936701563,"Ilustracja":null,"Fotografia":null},{"ID":18,"Nazwa":"Fara \u015bw. Piotra i Paw\u0142a","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":1516,"Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3453130264,"Dlugosc":18.6510775977,"Ilustracja":"Gdansk Piotr i Pawel.jpg","Fotografia":null},{"ID":19,"Nazwa":"Zamek","Miasto":"Olsztyn","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"\u015awiecka","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"2. \u0107w. XVI w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.7775945254,"Dlugosc":20.4742610933,"Ilustracja":"Olsztyn zamek.jpg","Fotografia":null},{"ID":20,"Nazwa":"Fara","Miasto":"Olsztyn","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"2. \u0107w. XVI w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.7764062491,"Dlugosc":20.4786166712,"Ilustracja":"Olsztyn.jpg","Fotografia":null},{"ID":21,"Nazwa":"Fara","Miasto":"Barczewo","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"po 1544","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.8287130193,"Dlugosc":20.6921576787,"Ilustracja":"Barczewo.jpg","Fotografia":null},{"ID":22,"Nazwa":"Ko\u015bci\u00f3\u0142 Cysters\u00f3w","Miasto":"Pelplin","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Pd. rami\u0119 transeptu","Datowanie":1557,"Majster":"Anton Schulte","Literatura":"Frazik 1979","Szerokosc":53.9275852729,"Dlugosc":18.6945965142,"Ilustracja":"Pelplin.jpg","Fotografia":null},{"ID":23,"Nazwa":"Fara \u015bw. Jana","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Kruchta pod wie\u017c\u0105","Datowanie":"1568, lub 1588\u20131595","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3520024715,"Dlugosc":18.6568903197,"Ilustracja":"Gdansk Jan.jpg","Fotografia":null},{"ID":24,"Nazwa":"Fara","Miasto":"Nowy Staw","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Ch\u00f3r","Datowanie":"1573\u20131574","Majster":"Bart\u0142omiej Piper","Literatura":"Frazik 1979","Szerokosc":54.1589600853,"Dlugosc":19.3993396935,"Ilustracja":"Nowy Staw.jpg","Fotografia":null},{"ID":25,"Nazwa":"Ko\u015bci\u00f3\u0142 Cysters\u00f3w","Miasto":"Oliwa","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Ramiona transeptu","Datowanie":1582,"Majster":"Bart\u0142omiej Piper","Literatura":"Frazik 1979","Szerokosc":54.4110884107,"Dlugosc":18.5586395879,"Ilustracja":"Oliwa.jpg","Fotografia":null},{"ID":26,"Nazwa":"Ko\u015bci\u00f3\u0142 Cysters\u00f3w","Miasto":"Oliwa","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienie z \u017cebrami krzywokre\u015blnymi","Umiejscowienie":"Skrzy\u017cowanie naw","Datowanie":1582,"Majster":"Bart\u0142omiej Piper","Literatura":"Frazik 1979","Szerokosc":54.4110884107,"Dlugosc":18.5586395879,"Ilustracja":"Oliwa.jpg","Fotografia":null},{"ID":27,"Nazwa":"Ko\u015bci\u00f3\u0142 Cysters\u00f3w","Miasto":"Oliwa","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Nawa g\u0142\u00f3wna","Datowanie":"1582 lub przed 1594","Majster":"Bart\u0142omiej Piper","Literatura":"Frazik 1979","Szerokosc":54.4110884107,"Dlugosc":18.5586395879,"Ilustracja":"Oliwa.jpg","Fotografia":null},{"ID":28,"Nazwa":"Klasztor Cysters\u00f3w","Miasto":"Oliwa","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Wielki Refektarz","Datowanie":"1593\u20131594","Majster":"Bart\u0142omiej Piper","Literatura":"Frazik 1979","Szerokosc":54.4110884107,"Dlugosc":18.5586395879,"Ilustracja":"Oliwa.jpg","Fotografia":null},{"ID":29,"Nazwa":"Ko\u015bci\u00f3\u0142 Karmelit\u00f3w","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":"Ch\u00f3r","Datowanie":"2. po\u0142. XVI w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3541038771,"Dlugosc":18.647413667,"Ilustracja":"Gdansk Jozef.jpg","Fotografia":null},{"ID":30,"Nazwa":"Fara","Miasto":"Puck","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienie z \u017cebrami krzywokre\u015blnymi","Umiejscowienie":"Kaplice","Datowanie":"przed 1597","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.7220018815,"Dlugosc":18.4145912954,"Ilustracja":"Puck.jpg","Fotografia":null},{"ID":31,"Nazwa":"Ko\u015bci\u00f3\u0142 Brygidek","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":null,"Umiejscowienie":null,"Datowanie":"1600\u20131604","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3547171208,"Dlugosc":18.6523163424,"Ilustracja":"Gdansk Brygida.jpg","Fotografia":null},{"ID":32,"Nazwa":"Fara \u015bw. Jakuba","Miasto":"Toru\u0144","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienia komponowane z prz\u0119se\u0142 tr\u00f3jk\u0105tnych","Umiejscowienie":"Kaplice boczne","Datowanie":null,"Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.0119683372,"Dlugosc":18.6128374516,"Ilustracja":"Torun Jakub.jpg","Fotografia":null},{"ID":33,"Nazwa":"Fara \u015bw. Jana","Miasto":"Toru\u0144","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Sklepienia komponowane z prz\u0119se\u0142 tr\u00f3jk\u0105tnych","Umiejscowienie":"Kaplice boczne","Datowanie":null,"Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.0094318044,"Dlugosc":18.6069194993,"Ilustracja":"Torun Jan.jpg","Fotografia":null},{"ID":34,"Nazwa":"Fara \u015bw. Jana","Miasto":"Toru\u0144","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste sze\u015bcioramienne","Umiejscowienie":"Zach. cz\u0119\u015b\u0107 korpusu","Datowanie":"2. po\u0142. XV w.","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.0094318044,"Dlugosc":18.6069194993,"Ilustracja":"Torun Jan.jpg","Fotografia":null},{"ID":35,"Nazwa":"Fara \u015bw. Jana","Miasto":"Toru\u0144","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z \u017cebrami grzbietowymi","Umiejscowienie":"Kruchta pod wie\u017c\u0105","Datowanie":"1407\u20131433","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.0094318044,"Dlugosc":18.6069194993,"Ilustracja":"Torun Jan.jpg","Fotografia":null},{"ID":36,"Nazwa":"Fara \u015bw. Katarzyny","Miasto":"Gda\u0144sk","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z tr\u00f3jk\u0105tnymi szczycikami na obu osiach dotykaj\u0105cymi obwodu sklepienia","Umiejscowienie":"Kaplica od pn.-wsch.","Datowanie":"oko\u0142o 1500","Majster":null,"Literatura":"Frazik 1979","Szerokosc":54.3541891809,"Dlugosc":18.6517409197,"Ilustracja":"Gdansk Katarzyna.jpg","Fotografia":null},{"ID":37,"Nazwa":"Fara","Miasto":"Bydgoszcz","Region":"Prusy Kr\u00f3l.","Panstwo":"Polska","Kategoria":"Sakralna","Typ_Sklepienia":"Gwia\u017adziste czteroramienne z tr\u00f3jk\u0105tnymi szczycikami na osi poprzecznej dotykaj\u0105cymi obwodu sklepienia","Umiejscowienie":"Nawy boczne","Datowanie":"1460\u20131502","Majster":null,"Literatura":"Frazik 1979","Szerokosc":53.1229815762,"Dlugosc":17.9995439126,"Ilustracja":"Bydgoszcz.jpg","Fotografia":null}];
+        const map = L.map('map', { zoomControl: false }).setView([53.8, 19.0], 7);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CARTO'
+        }).addTo(map);
+
+        const markersGroup = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            maxClusterRadius: 40,
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                const size = count < 10 ? 35 : (count < 20 ? 45 : 55);
+                return L.divIcon({
+                    html: `<div><span>${count}</span></div>`,
+                    className: 'custom-cluster',
+                    iconSize: L.point(size, size)
+                });
+            }
+        });
+
+        function renderMarkers() {
+            markersGroup.clearLayers();
+            const showSacral = document.getElementById('chk-sakralna').checked;
+            const showSecular = document.getElementById('chk-swiecka').checked;
+            let count = 0;
+
+            rawData.forEach(s => {
+                if(!s.Szerokosc || !s.Dlugosc) return;
+                const isSacral = s.Kategoria === "Sakralna";
+                const isSecular = s.Kategoria === "Świecka" || (!isSacral);
+                if ((isSacral && showSacral) || (isSecular && showSecular)) {
+                    count++;
+                    const fillColor = isSacral ? "#1e3a8a" : "#991b1b";
+                    const strokeColor = isSacral ? "#60a5fa" : "#f87171";
+                    const marker = L.circleMarker([s.Szerokosc, s.Dlugosc], {
+                        radius: 9, fillColor: fillColor, color: strokeColor, weight: 2, fillOpacity: 0.9
+                    });
+                    
+                    let tooltipImgHtml = s.Ilustracja ? `<img src="images/${s.Ilustracja}" class="tooltip-img" alt="Rzut">` : "";
+
+                    const tooltipHtml = `
+                        <div class="t-title">${s.Nazwa || "Obiekt nieznany"}</div>
+                        <div class="t-city">${s.Miasto || ""}</div>
+                        <div class="t-meta">
+                            <span>Typ:</span> <span>${s.Typ_Sklepienia || "---"}</span>
+                            <span>Umiejscowienie:</span> <span>${s.Umiejscowienie || "---"}</span>
+                            <span>Datowanie:</span> <span>${s.Datowanie || "---"}</span>
+                            <span>Majster:</span> <span>${s.Majster || "Nieznany"}</span>
+                        </div>
+                        ${tooltipImgHtml}
+                    `;
+                    marker.bindTooltip(tooltipHtml, { sticky: true, className: 'custom-tooltip' });
+                    
+                    const detailUrl = "details/" + Math.floor(s.ID) + ".html";
+                    marker.bindPopup(`
+                        <div style="text-align: center;">
+                            <b style="font-size:15px; font-family:'Merriweather', serif;">${s.Nazwa}</b>
+                            <a href="${detailUrl}" class="btn-more">Karta obiektu i rzuty →</a>
+                        </div>
+                    `, { minWidth: 250 });
+                    markersGroup.addLayer(marker);
+                }
+            });
+            map.addLayer(markersGroup);
+            document.getElementById('obj-count').innerText = count;
+        }
+        document.getElementById('chk-sakralna').addEventListener('change', renderMarkers);
+        document.getElementById('chk-swiecka').addEventListener('change', renderMarkers);
+        renderMarkers();
+    </script>
+</body>
+</html>
